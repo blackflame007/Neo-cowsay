@@ -1,3 +1,4 @@
+version: 2
 builds:
   - id: cowsay
     dir: cmd
@@ -7,26 +8,26 @@ builds:
       - CGO_ENABLED=0
     ldflags: -s -w -X main.version={{.Version}}
     goos:
-      - linux
-      - darwin
-      - windows
+      - "linux"
+      - "darwin"
+      - "windows"
     goarch:
-      - 386
-      - amd64
-      - arm
-      - arm64
+      - "386"
+      - "amd64"
+      - "arm"
+      - "arm64"
     goarm:
-      - 6
-      - 7
+      - "6"
+      - "7"
     ignore:
       - goos: darwin
-        goarch: 386
+        goarch: "386"
       - goos: linux
         goarch: arm
-        goarm: 7
+        goarm: "7"
       - goos: windows
         goarch: arm
-        goarm: 7
+        goarm: "7"
   - id: cowthink
     dir: cmd
     main: ./cowthink/main.go
@@ -35,58 +36,60 @@ builds:
       - CGO_ENABLED=0
     ldflags: -s -w -X main.version={{.Version}}
     goos:
-      - linux
-      - darwin
-      - windows
+      - "linux"
+      - "darwin"
+      - "windows"
     goarch:
-      - 386
-      - amd64
-      - arm
-      - arm64
+      - "386"
+      - "amd64"
+      - "arm"
+      - "arm64"
     goarm:
-      - 6
-      - 7
+      - "6"
+      - "7"
     ignore:
       - goos: darwin
-        goarch: 386
+        goarch: "386"
       - goos: linux
         goarch: arm
-        goarm: 7
+        goarm: "7"
       - goos: windows
         goarch: arm
-        goarm: 7
+        goarm: "7"
 
 archives:
-- builds:
-  - cowsay
-  - cowthink
-  name_template: 'cowsay_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-  replacements:
-    darwin: macOS
-    linux: Linux
-    windows: Windows
-    386: i386
-    amd64: x86_64
-  format_overrides:
-  - goos: windows
-    format: zip
-  files:
-  - LICENSE
-  - doc/cowsay.1
+  - ids:
+      - cowsay
+      - cowthink
+    name_template: >-
+      {{- .ProjectName }}_{{ .Version }}_
+      {{- if eq .Os "darwin" }}macOS
+      {{- else if eq .Os "linux" }}Linux
+      {{- else if eq .Os "windows" }}Windows
+      {{- else }}{{ .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        formats: ['zip']
+    files:
+      - LICENSE
+      - doc/cowsay.1
 
 brews:
-- name: neo-cowsay
-  tap:
-    owner: Code-Hex
-    name: homebrew-tap
-    token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-  homepage: https://github.com/Code-Hex/Neo-cowsay
-  description: "Fast, funny, everyone wanted? new cowsay!!"
-  folder: Formula
-  install: |
-    bin.install "cowsay"
-    bin.install "cowthink"
-    man1.install Dir["doc/cowsay.1"]
+  - name: neo-cowsay
+    repository:
+      owner: Code-Hex
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/Code-Hex/Neo-cowsay
+    description: "Fast, funny, everyone wanted? new cowsay!!"
+    directory: Formula
+    install: |
+      bin.install "cowsay"
+      bin.install "cowthink"
+      man1.install Dir["doc/cowsay.1"]
 
 nfpms:
   - license: Artistic License 2.0
@@ -109,7 +112,7 @@ changelog:
   sort: asc
   filters:
     exclude:
-    - '^docs:'
-    - '^test:'
-    - Merge pull request
-    - Merge branch
+      - '^docs:'
+      - '^test:'
+      - Merge pull request
+      - Merge branch
