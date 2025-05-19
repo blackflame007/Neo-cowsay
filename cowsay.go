@@ -1,19 +1,12 @@
 package cowsay
 
 import (
-	"io/ioutil"
-	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 )
-
-func init() {
-	rand.Seed(time.Now().UTC().UnixNano())
-}
 
 // Say to return cowsay string.
 func Say(phrase string, options ...Option) (string, error) {
@@ -81,7 +74,7 @@ func (c *CowFile) ReadAll() ([]byte, error) {
 		return Asset(joinedPath)
 	}
 	joinedPath := filepath.Join(c.BasePath, c.Name+".cow")
-	return ioutil.ReadFile(joinedPath)
+	return os.ReadFile(joinedPath)
 }
 
 // Cows to get list of cows
@@ -106,7 +99,7 @@ func cowsFromCowPath() ([]*CowPath, error) {
 	}
 	paths := splitPath(cowPath)
 	for _, path := range paths {
-		dirEntries, err := ioutil.ReadDir(path)
+		dirEntries, err := os.ReadDir(path)
 		if err != nil {
 			return nil, err
 		}
@@ -169,18 +162,35 @@ func (cow *Cow) GetCow() (string, error) {
 		}
 	}
 
-	// Second pass: resolve variable references within variables
-	for varName, varValue := range colorVars {
-		// Replace $thoughts in variable values
-		if strings.Contains(varValue, "$thoughts") {
-			colorVars[varName] = strings.Replace(varValue, "$thoughts", string(cow.thoughts), -1)
-		}
-
-		// Check for other variable references and resolve them
-		for otherVar, otherVal := range colorVars {
-			if strings.Contains(varValue, otherVar) && otherVar != varName {
-				colorVars[varName] = strings.Replace(varValue, otherVar, otherVal, -1)
+	// Second pass: resolve nested variable references
+	// We might need multiple passes to resolve variables that reference other variables
+	maxPasses := 5 // Prevent infinite loops
+	for i := 0; i < maxPasses; i++ {
+		madeChanges := false
+		for varName, varValue := range colorVars {
+			// Replace $thoughts in variable values
+			if strings.Contains(varValue, "$thoughts") {
+				newValue := strings.Replace(varValue, "$thoughts", string(cow.thoughts), -1)
+				if newValue != varValue {
+					colorVars[varName] = newValue
+					madeChanges = true
+				}
 			}
+
+			// Check for other variable references and resolve them
+			for otherVar, otherVal := range colorVars {
+				if strings.Contains(varValue, otherVar) && otherVar != varName {
+					newValue := strings.Replace(varValue, otherVar, otherVal, -1)
+					if newValue != varValue {
+						colorVars[varName] = newValue
+						madeChanges = true
+						break // Break and restart the loop since we've modified a value
+					}
+				}
+			}
+		}
+		if !madeChanges {
+			break // No more replacements were made, we're done
 		}
 	}
 
@@ -210,7 +220,7 @@ func (cow *Cow) GetCow() (string, error) {
 	cowStarted := false
 	for _, line := range separate {
 		// Check if we've reached the cow art
-		if strings.Contains(line, "<<EOC;") {
+		if !cowStarted && strings.Contains(line, "<<EOC") {
 			cowStarted = true
 			continue
 		}

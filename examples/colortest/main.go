@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	// Set the cow type to bender
+	// Set the cow type to archer
 	options := []cowsay.Option{
 		cowsay.Type("archer"),
 	}
