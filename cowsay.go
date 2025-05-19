@@ -135,30 +135,95 @@ func (cow *Cow) GetCow() (string, error) {
 		return "", err
 	}
 
-	r := strings.NewReplacer(
+	// Parse color variables from the cow file
+	colorVars := make(map[string]string)
+	lines := strings.Split(string(src), "\n")
+
+	// First pass: collect all variable definitions
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "$") && strings.Contains(line, "=") && !strings.Contains(line, "$the_cow") {
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				varName := strings.TrimSpace(parts[0])
+				varValue := strings.TrimSpace(parts[1])
+
+				// Remove comments but keep the rest of the value
+				if idx := strings.Index(varValue, "#"); idx != -1 {
+					varValue = varValue[:idx]
+					varValue = strings.TrimSpace(varValue)
+				}
+
+				// Extract the quoted part including spaces
+				if strings.HasPrefix(varValue, "\"") && strings.HasSuffix(varValue, "\";") {
+					varValue = strings.TrimSuffix(strings.TrimPrefix(varValue, "\""), "\";")
+				} else if strings.HasPrefix(varValue, "\"") && strings.HasSuffix(varValue, "\"") {
+					varValue = strings.TrimSuffix(strings.TrimPrefix(varValue, "\""), "\"")
+				}
+
+				// Replace \e with ESC character
+				varValue = strings.ReplaceAll(varValue, "\\e", "\033")
+
+				colorVars[varName] = varValue
+			}
+		}
+	}
+
+	// Second pass: resolve variable references within variables
+	for varName, varValue := range colorVars {
+		// Replace $thoughts in variable values
+		if strings.Contains(varValue, "$thoughts") {
+			colorVars[varName] = strings.Replace(varValue, "$thoughts", string(cow.thoughts), -1)
+		}
+
+		// Check for other variable references and resolve them
+		for otherVar, otherVal := range colorVars {
+			if strings.Contains(varValue, otherVar) && otherVar != varName {
+				colorVars[varName] = strings.Replace(varValue, otherVar, otherVal, -1)
+			}
+		}
+	}
+
+	// Create base replacements
+	replacements := []string{
 		"\\\\", "\\",
 		"\\@", "@",
 		"\\$", "$",
+		"\\e", "\033", // Add direct escape sequence replacement
 		"$eyes", cow.eyes,
 		"${eyes}", cow.eyes,
 		"$tongue", cow.tongue,
 		"${tongue}", cow.tongue,
 		"$thoughts", string(cow.thoughts),
 		"${thoughts}", string(cow.thoughts),
-	)
+	}
+
+	// Add color variable replacements
+	for varName, varValue := range colorVars {
+		replacements = append(replacements, varName, varValue)
+	}
+
+	r := strings.NewReplacer(replacements...)
 	newsrc := r.Replace(string(src))
 	separate := strings.Split(newsrc, "\n")
 	mow := make([]string, 0, len(separate))
+	cowStarted := false
 	for _, line := range separate {
-		if strings.Contains(line, "$the_cow = <<EOC") || strings.HasPrefix(line, "##") {
+		// Check if we've reached the cow art
+		if strings.Contains(line, "<<EOC;") {
+			cowStarted = true
 			continue
 		}
 
+		// End of cow art
 		if strings.HasPrefix(line, "EOC") {
 			break
 		}
 
-		mow = append(mow, line)
+		// Only include lines from the actual cow art
+		if cowStarted {
+			mow = append(mow, line)
+		}
 	}
 	return strings.Join(mow, "\n"), nil
 }
